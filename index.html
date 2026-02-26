@@ -159,6 +159,14 @@
   </div>
 
   <div class="chunk-select">
+    <div class="chunk-label">ヘッダー行</div>
+    <div class="chunk-btns">
+      <button class="chunk-btn active" onclick="setHeader(false)">なし</button>
+      <button class="chunk-btn" onclick="setHeader(true)">あり</button>
+    </div>
+  </div>
+
+  <div class="chunk-select">
     <div class="chunk-label">1ファイルあたりの件数</div>
     <div class="chunk-btns">
       <button class="chunk-btn" onclick="setChunk(100)">100件</button>
@@ -173,7 +181,7 @@
   <!-- 500件以下 -->
   <div class="no-split-box" id="noSplitBox">
     <div class="ns-icon">✅</div>
-    <div class="ns-text">件数が500件以下なので分割不要です</div>
+    <div class="ns-text" id="noSplitText">件数が500件以下なので分割不要です</div>
     <div class="ns-count" id="noSplitCount"></div>
     <div class="ns-text">そのままW2に取り込めます</div>
   </div>
@@ -192,14 +200,28 @@
 
 <script>
 let CHUNK = 500;
+let hasHeader = false;
 let splitFiles = [];
 
 function setChunk(n) {
   CHUNK = n;
-  document.querySelectorAll('.chunk-btn').forEach(b => {
-    b.classList.toggle('active', parseInt(b.textContent) === n);
+  document.querySelectorAll('.chunk-btns').forEach((btns, gi) => {
+    if (gi === 1) { // 件数ボタングループ
+      btns.querySelectorAll('.chunk-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.textContent) === n);
+      });
+    }
   });
-  // ファイルが読み込まれていたら再処理
+  const fi = document.getElementById('fileInput');
+  if (fi.files[0]) handleFile(fi.files[0]);
+}
+
+function setHeader(val) {
+  hasHeader = val;
+  const groups = document.querySelectorAll('.chunk-btns');
+  groups[0].querySelectorAll('.chunk-btn').forEach(b => {
+    b.classList.toggle('active', (b.textContent === 'あり') === val);
+  });
   const fi = document.getElementById('fileInput');
   if (fi.files[0]) handleFile(fi.files[0]);
 }
@@ -258,16 +280,17 @@ function handleFile(file) {
       const rows = parseCSV(text);
       if (!rows || rows.length < 2) { showError('CSVの解析に失敗しました。'); return; }
 
-      const header = rows[0];
-      const dataRows = rows.slice(1);
+      const allRows = rows;
+      const header = hasHeader ? allRows[0] : null;
+      const dataRows = hasHeader ? allRows.slice(1) : allRows;
       const total = dataRows.length;
       const baseName = file.name.replace(/\.csv$/i, '');
 
-      // 500件以下 → 分割不要
+      // CHUNK件以下 → 分割不要
       if (total <= CHUNK) {
+        document.getElementById('noSplitText').textContent = `件数が${CHUNK}件以下なので分割不要です`;
         document.getElementById('noSplitCount').textContent = total + '件';
         document.getElementById('noSplitBox').classList.add('visible');
-        document.getElementById('clearBtn').style.display = 'inline-block';
         return;
       }
 
@@ -276,7 +299,8 @@ function handleFile(file) {
       let fileNum = 1;
       for (let i = 0; i < total; i += CHUNK) {
         const chunk = dataRows.slice(i, i + CHUNK);
-        const csvStr = toCSVString([header, ...chunk]);
+        const csvRows = header ? [header, ...chunk] : chunk;
+        const csvStr = toCSVString(csvRows);
         const name = `${baseName}_${fileNum}.csv`;
         splitFiles.push({ name, csv: csvStr, count: chunk.length });
         fileNum++;
