@@ -186,7 +186,7 @@
     <button class="dl-all-btn" id="dlAllBtn">⬇ すべてまとめてダウンロード</button>
   </div>
 
-  <button class="clear-btn" id="clearBtn" onclick="clearAll()" style="display:none">🗑 クリア</button>
+  <button class="clear-btn" id="clearBtn" onclick="clearAll()">🗑 クリア</button>
 
 </div>
 
@@ -335,7 +335,6 @@ function clearAll(resetUpload = true) {
   document.getElementById('resultBox').classList.remove('visible');
   document.getElementById('noSplitBox').classList.remove('visible');
   document.getElementById('errorBox').classList.remove('visible');
-  document.getElementById('clearBtn').style.display = 'none';
   if (resetUpload) document.getElementById('fileInput').value = '';
 }
 
