@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSV分割ツール</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: #dddbd3;
+    --border2: #c8c5bb;
+    --text: #1a1a1a;
+    --text-mid: #555550;
+    --text-dim: #999990;
+    --accent: #2563eb;
+    --accent-bg: #eff6ff;
+    --ok: #16a34a;
+    --ok-bg: #f0fdf4;
+    --ok-border: #86efac;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', sans-serif; font-size: 13px; min-height: 100vh; }
+
+  header {
+    background: #0ea5e9;
+    border-bottom: 2px solid #0284c7;
+    padding: 18px 28px; display: flex; align-items: baseline; gap: 14px;
+  }
+  .logo { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; color: #fff; }
+  .logo span { color: #bae6fd; }
+  .subtitle { color: #e0f2fe; font-size: 12px; }
+
+  .main {
+    padding: 40px 28px; max-width: 600px;
+    margin: 0 auto; display: flex; flex-direction: column; align-items: center;
+  }
+
+  /* Upload */
+  .upload-area {
+    width: 100%;
+    background: var(--surface); border: 2px dashed var(--border2); border-radius: 10px;
+    padding: 48px 28px; text-align: center; cursor: pointer; transition: all 0.18s;
+    position: relative;
+  }
+  .upload-area:hover, .upload-area.drag-over {
+    border-color: var(--accent); background: var(--accent-bg);
+  }
+  .upload-area input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon { font-size: 40px; margin-bottom: 12px; }
+  .upload-text { font-size: 14px; color: var(--text-mid); }
+  .upload-text strong { color: var(--text); }
+  .upload-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+
+  /* 結果 */
+  .result-box {
+    width: 100%; background: var(--surface); border: 1.5px solid var(--ok-border);
+    border-radius: 10px; padding: 20px; margin-top: 20px;
+    background: var(--ok-bg); display: none;
+  }
+  .result-box.visible { display: block; }
+  .result-title {
+    font-size: 14px; font-weight: 700; color: var(--ok);
+    display: flex; align-items: center; gap: 7px; margin-bottom: 14px;
+  }
+  .result-info {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 7px;
+    padding: 12px 16px; margin-bottom: 14px; font-size: 12px; color: var(--text-mid);
+    display: flex; gap: 20px;
+  }
+  .ri-item .ri-n {
+    font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 600;
+    color: var(--text); line-height: 1;
+  }
+  .ri-item .ri-l { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+  .file-list { display: flex; flex-direction: column; gap: 8px; }
+  .file-item {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 7px;
+    padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .fi-left { display: flex; align-items: center; gap: 10px; }
+  .fi-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text); }
+  .fi-count { font-size: 11px; color: var(--text-dim); }
+  .fi-btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 6px 14px; font-size: 12px; font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 700; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; flex-shrink: 0;
+  }
+  .fi-btn:hover { opacity: 0.85; }
+
+  .dl-all-btn {
+    width: 100%; margin-top: 12px; padding: 12px;
+    background: var(--text); color: #fff; border: none; border-radius: 8px;
+    font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; gap: 7px;
+  }
+  .dl-all-btn:hover { opacity: 0.8; }
+
+  .clear-btn {
+    margin-top: 12px; background: transparent; border: 1.5px solid var(--border2);
+    border-radius: 6px; color: var(--text-dim); font-size: 12px;
+    font-family: 'Noto Sans JP', sans-serif; padding: 7px 18px; cursor: pointer; transition: all 0.15s;
+  }
+  .clear-btn:hover { border-color: var(--text); color: var(--text); }
+
+  /* 500件以下のとき */
+  .no-split-box {
+    width: 100%; background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 10px; padding: 24px; text-align: center; margin-top: 20px; display: none;
+  }
+  .no-split-box.visible { display: block; }
+  .no-split-box .ns-icon { font-size: 32px; margin-bottom: 8px; }
+  .no-split-box .ns-text { font-size: 13px; color: var(--text-mid); }
+  .no-split-box .ns-count { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 600; color: var(--ok); margin: 6px 0; }
+
+  /* 件数選択 */
+  .chunk-select { width: 100%; margin-top: 16px; }
+  .chunk-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 8px;
+  }
+  .chunk-btns { display: flex; gap: 8px; }
+  .chunk-btn {
+    flex: 1; padding: 9px 0; border-radius: 7px; border: 1.5px solid var(--border2);
+    background: var(--surface); color: var(--text-mid); font-size: 13px; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.15s;
+  }
+  .chunk-btn:hover { border-color: #0ea5e9; color: #0ea5e9; }
+  .chunk-btn.active { background: #0ea5e9; border-color: #0ea5e9; color: #fff; }
+
+  .error-box {
+    width: 100%; background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 8px;
+    padding: 12px 16px; color: #dc2626; font-size: 12px; margin-top: 14px; display: none;
+  }
+  .error-box.visible { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">ファイル分割ツール</div>
+  <div class="subtitle">CSVファイル分割ツール — 件数を選んで分割</div>
+</header>
+
+<div class="main">
+
+  <div class="upload-area" id="dropZone">
+    <input type="file" id="fileInput" accept=".csv">
+    <div class="upload-icon">📂</div>
+    <div class="upload-text"><strong>CSVファイルをドロップ</strong>、またはクリックして選択</div>
+    <div class="upload-hint">UTF-8 / Shift-JIS 対応　・　ヘッダー行は各ファイルに自動で付きます</div>
+  </div>
+
+  <div class="chunk-select">
+    <div class="chunk-label">1ファイルあたりの件数</div>
+    <div class="chunk-btns">
+      <button class="chunk-btn" onclick="setChunk(100)">100件</button>
+      <button class="chunk-btn" onclick="setChunk(200)">200件</button>
+      <button class="chunk-btn" onclick="setChunk(300)">300件</button>
+      <button class="chunk-btn active" onclick="setChunk(500)">500件</button>
+    </div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- 500件以下 -->
+  <div class="no-split-box" id="noSplitBox">
+    <div class="ns-icon">✅</div>
+    <div class="ns-text">件数が500件以下なので分割不要です</div>
+    <div class="ns-count" id="noSplitCount"></div>
+    <div class="ns-text">そのままW2に取り込めます</div>
+  </div>
+
+  <!-- 分割結果 -->
+  <div class="result-box" id="resultBox">
+    <div class="result-title">✅ 分割完了</div>
+    <div class="result-info" id="resultInfo"></div>
+    <div class="file-list" id="fileList"></div>
+    <button class="dl-all-btn" id="dlAllBtn">⬇ すべてまとめてダウンロード</button>
+  </div>
+
+  <button class="clear-btn" id="clearBtn" onclick="clearAll()" style="display:none">🗑 クリア</button>
+
+</div>
+
+<script>
+let CHUNK = 500;
+let splitFiles = [];
+
+function setChunk(n) {
+  CHUNK = n;
+  document.querySelectorAll('.chunk-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.textContent) === n);
+  });
+  // ファイルが読み込まれていたら再処理
+  const fi = document.getElementById('fileInput');
+  if (fi.files[0]) handleFile(fi.files[0]);
+}
+
+// ===== CSV パース =====
+function parseCSV(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const rows = [];
+  let cur = '', inQ = false;
+
+  const flushRow = () => {
+    if (!cur.trim()) return;
+    const row = []; let c = '', q = false;
+    for (let i = 0; i < cur.length; i++) {
+      const ch = cur[i];
+      if (ch === '"') { if (q && cur[i+1]==='"') { c+='"'; i++; } else q=!q; }
+      else if (ch === ',' && !q) { row.push(c); c=''; }
+      else c += ch;
+    }
+    row.push(c);
+    rows.push(row);
+    cur = '';
+  };
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') { inQ = !inQ; cur += ch; }
+    else if ((ch === '\n' || ch === '\r') && !inQ) {
+      if (ch === '\r' && text[i+1] === '\n') i++;
+      flushRow();
+    } else cur += ch;
+  }
+  flushRow();
+  return rows;
+}
+
+function toCSVString(rows) {
+  return '\uFEFF' + rows.map(row =>
+    row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+  ).join('\r\n');
+}
+
+// ===== ファイル処理 =====
+function handleFile(file) {
+  clearAll(false);
+
+  const tryRead = enc => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result); r.onerror = rej;
+    r.readAsText(file, enc);
+  });
+
+  tryRead('UTF-8')
+    .then(text => /\ufffd/.test(text) ? tryRead('Shift-JIS') : text)
+    .then(text => {
+      const rows = parseCSV(text);
+      if (!rows || rows.length < 2) { showError('CSVの解析に失敗しました。'); return; }
+
+      const header = rows[0];
+      const dataRows = rows.slice(1);
+      const total = dataRows.length;
+      const baseName = file.name.replace(/\.csv$/i, '');
+
+      // 500件以下 → 分割不要
+      if (total <= CHUNK) {
+        document.getElementById('noSplitCount').textContent = total + '件';
+        document.getElementById('noSplitBox').classList.add('visible');
+        document.getElementById('clearBtn').style.display = 'inline-block';
+        return;
+      }
+
+      // 分割
+      splitFiles = [];
+      let fileNum = 1;
+      for (let i = 0; i < total; i += CHUNK) {
+        const chunk = dataRows.slice(i, i + CHUNK);
+        const csvStr = toCSVString([header, ...chunk]);
+        const name = `${baseName}_${fileNum}.csv`;
+        splitFiles.push({ name, csv: csvStr, count: chunk.length });
+        fileNum++;
+      }
+
+      // 結果表示
+      document.getElementById('resultInfo').innerHTML = `
+        <div class="ri-item"><div class="ri-n">${total.toLocaleString()}</div><div class="ri-l">総件数</div></div>
+        <div class="ri-item"><div class="ri-n">${splitFiles.length}</div><div class="ri-l">分割ファイル数</div></div>
+        <div class="ri-item"><div class="ri-n">${CHUNK}</div><div class="ri-l">1ファイルの最大件数</div></div>
+      `;
+
+      document.getElementById('fileList').innerHTML = splitFiles.map((f, i) =>
+        `<div class="file-item">
+          <div class="fi-left">
+            <span style="font-size:16px">📄</span>
+            <div>
+              <div class="fi-name">${esc(f.name)}</div>
+              <div class="fi-count">${f.count.toLocaleString()}件</div>
+            </div>
+          </div>
+          <button class="fi-btn" onclick="downloadOne(${i})">⬇ DL</button>
+        </div>`
+      ).join('');
+
+      document.getElementById('resultBox').classList.add('visible');
+      document.getElementById('clearBtn').style.display = 'inline-block';
+    })
+    .catch(() => showError('ファイルの読み込みに失敗しました。'));
+}
+
+function downloadOne(i) {
+  const f = splitFiles[i];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([f.csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = f.name;
+  a.click();
+}
+
+function downloadAll() {
+  // 少し間隔を空けて順番にダウンロード
+  splitFiles.forEach((f, i) => {
+    setTimeout(() => downloadOne(i), i * 400);
+  });
+}
+
+document.getElementById('dlAllBtn').addEventListener('click', downloadAll);
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = '⚠ ' + msg; el.classList.add('visible');
+}
+
+function clearAll(resetUpload = true) {
+  splitFiles = [];
+  document.getElementById('resultBox').classList.remove('visible');
+  document.getElementById('noSplitBox').classList.remove('visible');
+  document.getElementById('errorBox').classList.remove('visible');
+  document.getElementById('clearBtn').style.display = 'none';
+  if (resetUpload) document.getElementById('fileInput').value = '';
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ===== イベント =====
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+</script>
+</body>
+</html>
